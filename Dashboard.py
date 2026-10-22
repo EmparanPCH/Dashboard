@@ -2,6 +2,8 @@ from datetime import date, datetime
 from io import BytesIO
 from html import escape
 from collections import Counter
+from pathlib import Path
+import base64
 import math
 import re
 import unicodedata
@@ -146,7 +148,6 @@ def cargar_datos(contenido_archivo):
                 "inicio": fecha_excel(celdas[9]),  # J: Comienzo LB
                 "fin": fecha_excel(celdas[10]),  # K: Fin LB
                 "hh": numero(celdas[11]),  # L: Trabajo (h)
-                "peso": numero(celdas[13]),  # N: Incidencia
                 "curva_plan": curva_plan,
                 "curva_real": curva_real,
             }
@@ -251,24 +252,27 @@ def contexto_actividades(filas):
 
 st.title("Dashboard de Construcción BESS")
 st.caption(
-    'Fuente: hoja "DUNE BESS CONSTR." del archivo de avance. '
-    "El libro se abre en modo de solo lectura."
+    'Fuente: extracto de datos de la hoja "DUNE BESS CONSTR.". '
+    "La información se carga automáticamente al abrir la aplicación."
 )
-
-archivo = st.sidebar.file_uploader(
-    "Selecciona el archivo Excel de avance",
-    type=["xlsm", "xlsx"],
-    help="Carga el anexo que contiene la hoja DUNE BESS CONSTR.",
-)
-
-if archivo is None:
-    st.info("Carga el archivo .xlsm o .xlsx para visualizar el dashboard.")
-    st.stop()
 
 try:
-    datos = cargar_datos(archivo.getvalue())
+    ruta_datos = Path(__file__).resolve().with_name("dashboard_data.xlsx")
+    ruta_datos_codificados = Path(__file__).resolve().with_name("dashboard_data.xlsx.b64")
+    if ruta_datos.is_file():
+        contenido_datos = ruta_datos.read_bytes()
+    elif ruta_datos_codificados.is_file():
+        contenido_datos = base64.b64decode(
+            ruta_datos_codificados.read_bytes(),
+            validate=True,
+        )
+    else:
+        raise FileNotFoundError(
+            "Falta dashboard_data.xlsx. Ejecuta preparar_datos.py con el archivo fuente."
+        )
+    datos = cargar_datos(contenido_datos)
 except Exception as error:
-    st.error(f"No fue posible leer el archivo: {error}")
+    st.error(f"No fue posible cargar los datos publicados: {error}")
     st.stop()
 
 filas = datos["filas"]
